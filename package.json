@@ -73,5 +73,8 @@
   },
   "dependencies": {
     "minimist": "^1.2.0"
+  },
+  "resolutions": {
+    "grunt-nw-builder/nw-builder": "3.5.7"
   }
 }
