@@ -38,3 +38,7 @@ report
 
 # marked as private
 *.private.*
+
+# yarn local installs
+yarn.lock
+yarn-error.log
