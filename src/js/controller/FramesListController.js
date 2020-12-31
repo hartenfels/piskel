@@ -30,15 +30,22 @@
 
   ns.FramesListController.prototype.init = function() {
     $.subscribe(Events.TOOL_RELEASED, this.flagCurrentPreviewForRedraw_.bind(this));
-    $.subscribe(Events.PISKEL_RESET, this.flagForRedraw_.bind(this, true));
+    $.subscribe(Events.PISKEL_RESET, this.onPiskelReset_.bind(this));
     $.subscribe(Events.USER_SETTINGS_CHANGED, this.flagForRedraw_.bind(this, false));
-
-    $.subscribe(Events.PISKEL_RESET, this.refreshZoom_.bind(this));
 
     this.previewListScroller = document.querySelector('#preview-list-scroller');
     this.previewListScroller.addEventListener('scroll', this.updateScrollerOverflows.bind(this));
     this.container.addEventListener('click', this.onContainerClick_.bind(this));
     this.updateScrollerOverflows();
+  };
+
+  ns.FramesListController.prototype.onPiskelReset_ = function (event, optimization) {
+    if (optimization && optimization.affectedFrameIndexes) {
+      optimization.affectedFrameIndexes.forEach(this.previewsToRedraw.add.bind(this.previewsToRedraw));
+    } else {
+      this.flagForRedraw_(true);
+      this.refreshZoom_();
+    }
   };
 
   ns.FramesListController.prototype.flagCurrentPreviewForRedraw_ = function () {
