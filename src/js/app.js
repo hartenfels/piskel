@@ -20,6 +20,23 @@
 
       this.shortcutService = new pskl.service.keyboard.ShortcutService();
       this.shortcutService.init();
+      this.shortcutService.registerShortcut(pskl.service.keyboard.Shortcuts.MISC.PROFILER, function () {
+        var gui = require('nw.gui');
+        gui.Window.get().showDevTools();
+        // $.publish(Events.SHOW_NOTIFICATION, [{
+        //   'content': 'Opening dev tools',
+        //   'hideDelay' : 5000
+        // }]);
+        // gui.Window.open('about:blank', {}, function (win) {
+        //   win.showDevTools(undefined, function () {
+        //     win.close();
+        //     $.publish(Events.SHOW_NOTIFICATION, [{
+        //       'content': 'Dev tools shown',
+        //       'hideDelay' : 5000
+        //     }]);
+        //   });
+        // });
+      });
 
       var size = pskl.UserSettings.get(pskl.UserSettings.DEFAULT_SIZE);
       var fps = Constants.DEFAULT.FPS;

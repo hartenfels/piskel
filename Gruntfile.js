@@ -278,9 +278,10 @@ module.exports = function(grunt) {
           win: true,
           linux32: true,
           linux64: true,
-          flavor: "normal",
+          flavor: "sdk",
         },
-        src: ['./dest/prod/**/*', "./package.json", "!./dest/desktop/"]
+        // src: ['./dest/prod/**/*', "./package.json", "!./dest/desktop/"]
+        src: ['./dest/dev/**/*', "./package.json", "!./dest/desktop/"]
       },
       macos : {
         options: {
@@ -288,7 +289,7 @@ module.exports = function(grunt) {
           osx64: true,
           version : "0.50.2",
           build_dir: './dest/desktop/',
-          flavor: "normal",
+          flavor: "sdk",
         },
         src: ['./dest/prod/**/*', "./package.json", "!./dest/desktop/"]
       },
@@ -328,7 +329,8 @@ module.exports = function(grunt) {
   grunt.registerTask('merge-statics', ['concat:js', 'concat:css', 'uglify']);
   grunt.registerTask('build',  ['clean:prod', 'sprite', 'merge-statics', 'build-index.html', 'replace:mainPartial', 'replace:css', 'copy:prod']);
   grunt.registerTask('build-dev',  ['clean:dev', 'sprite', 'build-index.html', 'copy:dev']);
-  grunt.registerTask('desktop', ['clean:desktop', 'default', 'nwjs:windows']);
+  // grunt.registerTask('desktop', ['clean:desktop', 'default', 'nwjs:windows']);
+  grunt.registerTask('desktop', ['clean:desktop', 'lint', 'build-dev', 'nwjs:windows']);
   grunt.registerTask('desktop-mac', ['clean:desktop', 'default', 'nwjs:macos']);
   grunt.registerTask('desktop-mac-old', ['clean:desktop', 'default', 'replace:desktop', 'nwjs:macos_old']);
 

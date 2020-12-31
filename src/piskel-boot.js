@@ -55,7 +55,7 @@
     document.head.appendChild(link);
   };
 
-  if (window.location.href.indexOf('debug') != -1) {
+  if (true || window.location.href.indexOf('debug') != -1) {
     window.pskl_exports = {};
     var scriptIndex = 0;
     window.loadNextScript = function () {

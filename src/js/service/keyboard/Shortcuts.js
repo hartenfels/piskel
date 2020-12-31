@@ -67,6 +67,7 @@
       OFFSET_RIGHT : createShortcut('move-right', 'Move viewport right', 'shift+right'),
       OFFSET_DOWN : createShortcut('move-down', 'Move viewport down', 'shift+down'),
       OFFSET_LEFT : createShortcut('move-left', 'Move viewport left', 'shift+left'),
+      PROFILER : createShortcut('profiler', 'Profiler', 'ctrl+shift+P'),
     },
 
     STORAGE : {

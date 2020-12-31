@@ -13,14 +13,15 @@
     "url": "http://github.com/piskelapp/piskel.git"
   },
   "files": [
-    "dest/prod",
+    "dest/dev",
     "misc/scripts/piskel-root"
   ],
+  "chromium-args": "--enable-logging=stderr",
   "bin": {
     "piskel-root": "./misc/scripts/piskel-root",
     "piskel-cli": "./cli/index.js"
   },
-  "main": "./dest/prod/index.html",
+  "main": "./dest/dev/index.html",
   "dom_storage_quota": 512,
   "scripts": {
     "test": "grunt test",
@@ -67,7 +68,7 @@
   },
   "window": {
     "title": "Piskel",
-    "icon": "dest/prod/logo.png",
+    "icon": "dest/dev/logo.png",
     "toolbar": false,
     "width": 1000,
     "height": 700
