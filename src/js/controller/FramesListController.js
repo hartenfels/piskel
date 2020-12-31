@@ -18,6 +18,8 @@
     this.redrawFlag = true;
     this.regenerateDomFlag = true;
     this.justDropped = false;
+    this.framesToRedraw = new Set();
+    this.previewsToRedraw = new Set();
 
     this.cachedFrameProcessor = new pskl.model.frame.CachedFrameProcessor();
     this.cachedFrameProcessor.setFrameProcessor(this.frameToPreviewCanvas_.bind(this));
@@ -27,9 +29,9 @@
   };
 
   ns.FramesListController.prototype.init = function() {
-    $.subscribe(Events.TOOL_RELEASED, this.flagForRedraw_.bind(this));
+    $.subscribe(Events.TOOL_RELEASED, this.flagCurrentPreviewForRedraw_.bind(this));
     $.subscribe(Events.PISKEL_RESET, this.flagForRedraw_.bind(this, true));
-    $.subscribe(Events.USER_SETTINGS_CHANGED, this.flagForRedraw_.bind(this));
+    $.subscribe(Events.USER_SETTINGS_CHANGED, this.flagForRedraw_.bind(this, false));
 
     $.subscribe(Events.PISKEL_RESET, this.refreshZoom_.bind(this));
 
@@ -37,6 +39,10 @@
     this.previewListScroller.addEventListener('scroll', this.updateScrollerOverflows.bind(this));
     this.container.addEventListener('click', this.onContainerClick_.bind(this));
     this.updateScrollerOverflows();
+  };
+
+  ns.FramesListController.prototype.flagCurrentPreviewForRedraw_ = function () {
+    this.previewsToRedraw.add(this.piskelController.getCurrentFrameIndex());
   };
 
   ns.FramesListController.prototype.flagForRedraw_ = function (regenerateDom) {
@@ -51,6 +57,20 @@
     this.zoom = this.calculateZoom_();
   };
 
+  ns.FramesListController.prototype.updateTileCanvas_ = function (tile, i, force) {
+    var frame = this.piskelController.getCurrentLayer().getFrameAt(i);
+    if (force || tile.getAttribute('data-tile-hash') !== frame.getHash()) {
+      var canvasForFrame = this.getCanvasForFrame(frame);
+      var canvasContainer = tile.querySelector('.canvas-container');
+      var canvas = tile.querySelector('canvas');
+      if (canvas) {
+        canvasContainer.replaceChild(canvasForFrame, canvas);
+      } else {
+        canvasContainer.appendChild(canvasForFrame);
+      }
+    }
+  };
+
   ns.FramesListController.prototype.render = function () {
     if (this.redrawFlag) {
       if (this.regenerateDomFlag) {
@@ -63,6 +83,22 @@
 
       this.updatePreviews_();
       this.redrawFlag = false;
+      this.redrawFrameIndex = -1;
+      this.framesToRedraw.clear();
+    } else {
+      var framesToRedraw = this.framesToRedraw;
+      if (framesToRedraw.size !== 0) {
+        this.updatePreviews_(framesToRedraw);
+        framesToRedraw.clear();
+      }
+
+      var previewsToRedraw = this.previewsToRedraw;
+      if (previewsToRedraw.size !== 0) {
+        previewsToRedraw.forEach(function (i) {
+          this.updateTileCanvas_(this.tiles[i], i, true);
+        }, this);
+        previewsToRedraw.clear();
+      }
     }
   };
 
@@ -102,60 +138,65 @@
       this.previewList.insertBefore(clonedTile, this.tiles[index].nextSibling);
       this.tiles.splice(index, 0, clonedTile);
       this.updateScrollerOverflows();
+      this.flagForRedraw_();
     } else if (action === ACTION.DELETE) {
       this.piskelController.removeFrameAt(index);
       this.previewList.removeChild(this.tiles[index]);
       this.tiles.splice(index, 1);
       this.updateScrollerOverflows();
+      this.flagForRedraw_();
     } else if (action === ACTION.SELECT && !this.justDropped) {
-      this.piskelController.setCurrentFrameIndex(index);
+      var lastIndex = this.piskelController.getCurrentFrameIndex();
+      if (lastIndex !== index) {
+        this.piskelController.setCurrentFrameIndex(index);
+        this.framesToRedraw.add(lastIndex);
+        this.framesToRedraw.add(index);
+      }
     } else if (action === ACTION.NEW_FRAME) {
       this.piskelController.addFrame();
       var newtile = this.createPreviewTile_(this.tiles.length);
       this.tiles.push(newtile);
       this.previewList.insertBefore(newtile, this.addFrameTile);
       this.updateScrollerOverflows();
+      this.flagForRedraw_();
     } else if (action == ACTION.TOGGLE) {
       this.piskelController.toggleFrameVisibilityAt(index);
+      this.framesToRedraw.add(index);
     }
-
-    this.flagForRedraw_();
   };
 
-  ns.FramesListController.prototype.updatePreviews_ = function () {
-    var i;
-    var length;
+  function addOrRemoveClass(element, className, condition) {
+    if (condition) {
+      element.classList.add(className);
+    } else {
+      element.classList.remove(className);
+    }
+  }
 
-    for (i = 0, length = this.tiles.length; i < length; i++) {
-      // Remove selected class
-      this.tiles[i].classList.remove('selected');
+  ns.FramesListController.prototype.updatePreview_ = function (selectedIndex, i) {
+    var tile = this.tiles[i];
+    addOrRemoveClass(tile, 'selected', i === selectedIndex);
+    tile.setAttribute('data-tile-number', i);
 
-      // Remove toggle class
-      this.tiles[i].querySelector('.tile-count').classList.remove('toggled');
+    var tileCount = tile.querySelector('.tile-count');
+    addOrRemoveClass(tileCount, 'toggled', this.piskelController.hasVisibleFrameAt(i));
+    tileCount.textContent = (i + 1);
 
-      // Update tile numbers
-      this.tiles[i].setAttribute('data-tile-number', i);
-      this.tiles[i].querySelector('.tile-count').innerHTML = (i + 1);
+    // Update preview if needed
+    this.updateTileCanvas_(tile, i, false);
+  };
 
-      // Update visibility
-      if (this.piskelController.hasVisibleFrameAt(i)) {
-        this.tiles[i].querySelector('.tile-count').classList.add('toggled');
+  ns.FramesListController.prototype.updatePreviews_ = function (indexes) {
+    var selectedIndex = this.piskelController.getCurrentFrameIndex();
+    var updatePreview = this.updatePreview_.bind(this, selectedIndex);
+    if (indexes === undefined) {
+      var i;
+      var length;
+      for (i = 0, length = this.tiles.length; i < length; i++) {
+        updatePreview(i);
       }
-
-      // Check if any tile is updated
-      var hash = this.piskelController.getCurrentLayer().getFrameAt(i).getHash();
-      if (this.tiles[i].getAttribute('data-tile-hash') !== hash) {
-        if (this.tiles[i].querySelector('canvas')) {
-          this.tiles[i].querySelector('.canvas-container').replaceChild(
-            this.getCanvasForFrame(this.piskelController.getCurrentLayer().getFrameAt(i)),
-            this.tiles[i].querySelector('canvas')
-          );
-        } else {
-          this.tiles[i].querySelector('.canvas-container').appendChild(
-            this.getCanvasForFrame(this.piskelController.getCurrentLayer().getFrameAt(i))
-          );
-        }
-      }
+    } else {
+      indexes.forEach(updatePreview);
     }
 
     // Hide/Show buttons if needed
@@ -164,9 +205,6 @@
     for (i = 0, length = buttons.length; i < length; i++) {
       buttons[i].style.display = display;
     }
-
-    // Add selected class
-    this.tiles[this.piskelController.getCurrentFrameIndex()].classList.add('selected');
   };
 
   ns.FramesListController.prototype.createPreviews_ = function () {
@@ -307,7 +345,7 @@
     tileCount.setAttribute('data-tile-number', tileNumber);
     tileCount.setAttribute('data-tile-action', ACTION.TOGGLE);
     tileCount.className = 'tile-overlay tile-count toggle-frame-action';
-    tileCount.innerHTML = tileNumber + 1;
+    tileCount.textContent = tileNumber + 1;
     previewTileRoot.appendChild(tileCount);
 
     return previewTileRoot;
