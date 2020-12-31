@@ -86,6 +86,9 @@
       color : color,
       penSize : penSize,
       isStraight : isStraight
+    }, {
+      affectsOnlyCurrentFrame : true,
+      affectsOnlyCurrentLayer : true,
     });
   };
 

@@ -89,6 +89,9 @@
       ctrlKey : ctrlKey,
       altKey : event.altKey,
       shiftKey : event.shiftKey
+    }, {
+      affectsOnlyCurrentFrame : true,
+      affectsOnlyCurrentLayer : true,
     });
   };
 

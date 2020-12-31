@@ -17,6 +17,9 @@
       altKey : evt.altKey,
       allFrames : allFrames,
       allLayers : allLayers
+    }, {
+      affectsOnlyCurrentFrame : !allFrames,
+      affectsOnlyCurrentLayer : !allLayers,
     });
   };
 

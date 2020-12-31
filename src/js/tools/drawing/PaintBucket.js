@@ -25,6 +25,9 @@
       col : col,
       row : row,
       color : color
+    }, {
+      affectsOnlyCurrentFrame : true,
+      affectsOnlyCurrentLayer : true,
     });
   };
 

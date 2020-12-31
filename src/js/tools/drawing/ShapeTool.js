@@ -66,6 +66,9 @@
       startRow : this.startRow,
       color : color,
       penSize : penSize
+    }, {
+      affectsOnlyCurrentFrame : true,
+      affectsOnlyCurrentLayer : true,
     });
   };
 

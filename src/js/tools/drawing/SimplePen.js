@@ -84,6 +84,9 @@
     this.raiseSaveStateEvent({
       pixels : this.pixels.slice(0),
       color : this.getToolColor()
+    }, {
+      affectsOnlyCurrentFrame : true,
+      affectsOnlyCurrentLayer : true,
     });
 
     // reset

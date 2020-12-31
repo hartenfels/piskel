@@ -35,6 +35,9 @@
         allFrames : allFrames,
         oldColor : oldColor,
         newColor : newColor
+      }, {
+        affectsOnlyCurrentFrame : !allFrames,
+        affectsOnlyCurrentLayer : !allLayers,
       });
     }
   };

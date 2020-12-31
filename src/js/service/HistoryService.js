@@ -84,12 +84,63 @@
     return state.uuid;
   };
 
+  ns.HistoryService.prototype.mergeOptimization_ = function (state, output) {
+    if (!output) {
+      output = {};
+    }
+    if (state && state.action.optimize) {
+      var optimize = state.action.optimize;
+
+      if (!output.layersUnoptimizable && optimize.affectsOnlyCurrentLayer) {
+        if (!output.affectedLayerIndexes) {
+          output.affectedLayerIndexes = new Set();
+        }
+        output.affectedLayerIndexes.add(state.layerIndex);
+      } else {
+        delete output.affectedLayerIndexes;
+        output.layersUnoptimizable = true;
+      }
+
+      if (!output.framesUnoptimizable && optimize.affectsOnlyCurrentFrame) {
+        if (!output.affectedFrameIndexes) {
+          output.affectedFrameIndexes = new Set();
+        }
+        output.affectedFrameIndexes.add(state.frameIndex);
+      } else {
+        delete output.affectedFrameIndexes;
+        output.framesUnoptimizable = true;
+      }
+    }
+    return output;
+  };
+
+  ns.HistoryService.prototype.getUndoOptimizationFunction_ = function (i) {
+    var state = this.stateQueue[i];
+    if (state && state.action.optimize) {
+      var optimization = this.mergeOptimization_(state);
+      return function () {
+        return optimization;
+      };
+    }
+    return undefined;
+  },
+
   ns.HistoryService.prototype.undo = function () {
-    this.loadState(this.currentIndex - 1);
+    this.loadState(this.currentIndex - 1, {
+      getOptimization : this.getUndoOptimizationFunction_(this.currentIndex),
+    });
   };
 
   ns.HistoryService.prototype.redo = function () {
-    this.loadState(this.currentIndex + 1);
+    var mergeOptimization = this.mergeOptimization_.bind(this);
+    this.loadState(this.currentIndex + 1, {
+      onReplay : function (state) {
+        this.optimization = mergeOptimization(state, this.optimization);
+      },
+      getOptimization : function () {
+        return this.optimization;
+      },
+    });
   };
 
   ns.HistoryService.prototype.isLoadStateAllowed_ = function (index) {
@@ -112,7 +163,7 @@
     return index;
   };
 
-  ns.HistoryService.prototype.loadState = function (index) {
+  ns.HistoryService.prototype.loadState = function (index, optimizer) {
     try {
       if (this.isLoadStateAllowed_(index)) {
         this.lastLoadState = Date.now();
@@ -122,7 +173,9 @@
           throw 'Could not find previous SNAPSHOT saved in history stateQueue';
         }
         var serializedPiskel = this.getSnapshotFromState_(snapshotIndex);
-        var onPiskelLoadedCb = this.onPiskelLoaded_.bind(this, index, snapshotIndex);
+        var onPiskelLoadedCb = function (piskel) {
+          this.onPiskelLoaded_(index, snapshotIndex, piskel, optimizer);
+        }.bind(this);
         this.deserializer.deserialize(serializedPiskel, onPiskelLoadedCb);
       }
     } catch (error) {
@@ -151,7 +204,20 @@
     return piskelSnapshot;
   };
 
-  ns.HistoryService.prototype.onPiskelLoaded_ = function (index, snapshotIndex, piskel) {
+  ns.HistoryService.prototype.normalizeOptimization_ = function (input) {
+    var output = {};
+    if (input) {
+      if (!input.layersUnoptimizable && input.affectedLayerIndexes) {
+        output.affectedLayerIndexes = Array.from(input.affectedLayerIndexes);
+      }
+      if (!input.framesUnoptimizable && input.affectedFrameIndexes) {
+        output.affectedFrameIndexes = Array.from(input.affectedFrameIndexes);
+      }
+    }
+    return output;
+  };
+
+  ns.HistoryService.prototype.onPiskelLoaded_ = function (index, snapshotIndex, piskel, optimizer) {
     var originalSize = this.getPiskelSize_();
     piskel.setDescriptor(this.piskelController.piskel.getDescriptor());
     // propagate save path to the new piskel instance
@@ -162,16 +228,29 @@
       var state = this.stateQueue[i];
       this.setupState(state);
       this.replayState(state);
+      if (optimizer && optimizer.onReplay) {
+        optimizer.onReplay(state);
+      }
     }
 
     // Should only do this when going backwards
     var lastState = this.stateQueue[index + 1];
     if (lastState) {
       this.setupState(lastState);
+      if (optimizer && optimizer.onLastState) {
+        optimizer.onLastState(lastState);
+      }
+    }
+
+    var optimization;
+    if (optimizer && optimizer.getOptimization) {
+      optimization = this.normalizeOptimization_(optimizer.getOptimization());
+    } else {
+      optimization = this.normalizeOptimization_(null);
     }
 
     this.currentIndex = index;
-    $.publish(Events.PISKEL_RESET);
+    $.publish(Events.PISKEL_RESET, optimization);
     $.publish(Events.HISTORY_STATE_LOADED);
     if (originalSize !== this.getPiskelSize_()) {
       $.publish(Events.FRAME_SIZE_CHANGED);
