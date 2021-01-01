@@ -132,15 +132,29 @@
   };
 
   ns.HistoryService.prototype.redo = function () {
+    var index = this.currentIndex + 1;
     var mergeOptimization = this.mergeOptimization_.bind(this);
-    this.loadState(this.currentIndex + 1, {
+    var optimizer = {
       onReplay : function (state) {
         this.optimization = mergeOptimization(state, this.optimization);
       },
       getOptimization : function () {
         return this.optimization;
       },
-    });
+    };
+    if (!this.fastTrackRedo_(index, optimizer)) {
+      delete optimizer.optimization;
+      this.loadState(index, optimizer);
+    }
+  };
+
+  ns.HistoryService.prototype.fastTrackRedo_ = function (index, optimizer) {
+    if (this.isLoadStateAllowed_(index) && this.stateQueue[index].action.type === 'REPLAY') {
+      this.replay_(index, this.currentIndex, optimizer);
+      return true;
+    } else {
+      return false;
+    }
   };
 
   ns.HistoryService.prototype.isLoadStateAllowed_ = function (index) {
@@ -173,10 +187,8 @@
           throw 'Could not find previous SNAPSHOT saved in history stateQueue';
         }
         var serializedPiskel = this.getSnapshotFromState_(snapshotIndex);
-        var onPiskelLoadedCb = function (piskel) {
-          this.onPiskelLoaded_(index, snapshotIndex, piskel, optimizer);
-        }.bind(this);
-        this.deserializer.deserialize(serializedPiskel, onPiskelLoadedCb);
+        var replayCallback = this.replay_.bind(this, index, snapshotIndex, optimizer);
+        this.deserializer.deserialize(serializedPiskel, replayCallback);
       }
     } catch (error) {
       console.error('[CRITICAL ERROR] : Unable to load a history state.');
@@ -217,12 +229,16 @@
     return output;
   };
 
-  ns.HistoryService.prototype.onPiskelLoaded_ = function (index, snapshotIndex, piskel, optimizer) {
+  ns.HistoryService.prototype.replay_ = function (index, snapshotIndex, optimizer, piskel) {
     var originalSize = this.getPiskelSize_();
-    piskel.setDescriptor(this.piskelController.piskel.getDescriptor());
-    // propagate save path to the new piskel instance
-    piskel.savePath = this.piskelController.piskel.savePath;
-    this.piskelController.setPiskel(piskel);
+
+    // Fast-track redos don't load a new piskel.
+    if (piskel) {
+      piskel.setDescriptor(this.piskelController.piskel.getDescriptor());
+      // propagate save path to the new piskel instance
+      piskel.savePath = this.piskelController.piskel.savePath;
+      this.piskelController.setPiskel(piskel);
+    }
 
     for (var i = snapshotIndex + 1 ; i <= index ; i++) {
       var state = this.stateQueue[i];
