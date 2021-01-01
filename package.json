@@ -21,6 +21,7 @@
     "piskel-cli": "./cli/index.js"
   },
   "main": "./dest/prod/index.html",
+  "dom_storage_quota": 512,
   "scripts": {
     "test": "grunt test",
     "dev": "grunt play",
