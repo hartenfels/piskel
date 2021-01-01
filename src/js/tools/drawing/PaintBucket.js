@@ -19,7 +19,8 @@
    */
   ns.PaintBucket.prototype.applyToolAt = function(col, row, frame, overlay, event) {
     var color = this.getToolColor();
-    pskl.PixelUtils.paintSimilarConnectedPixelsFromFrame(frame, col, row, color);
+    var undoFrame = this.wrapFrameForUndo(frame);
+    pskl.PixelUtils.paintSimilarConnectedPixelsFromFrame(undoFrame, col, row, color);
 
     this.raiseSaveStateEvent({
       col : col,
@@ -28,10 +29,16 @@
     }, {
       affectsOnlyCurrentFrame : true,
       affectsOnlyCurrentLayer : true,
+    }, {
+      pixels : undoFrame.getUndoPixels(),
     });
   };
 
   ns.PaintBucket.prototype.replay = function (frame, replayData) {
     pskl.PixelUtils.paintSimilarConnectedPixelsFromFrame(frame, replayData.col, replayData.row, replayData.color);
+  };
+
+  ns.PaintBucket.prototype.undo = function (frame, undoData) {
+    this.setPixelsToFrame(frame, undoData.pixels);
   };
 })();

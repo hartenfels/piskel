@@ -15,6 +15,7 @@
     this.previousRow = null;
 
     this.pixels = [];
+    this.undoPixels = new Map();
   };
 
   pskl.utils.inherit(ns.SimplePen, ns.BaseTool);
@@ -46,6 +47,14 @@
   ns.SimplePen.prototype.draw = function(color, col, row, frame, overlay) {
     overlay.setPixel(col, row, color);
     if (color === Constants.TRANSPARENT_COLOR) {
+      var index = row * frame.getWidth() + col;
+      if (!this.undoPixels.has(index)) {
+        this.undoPixels.set(index, {
+          col : col,
+          row : row,
+          color : frame.getPixel(col, row),
+        });
+      }
       frame.setPixel(col, row, color);
     }
     this.pixels.push({
@@ -78,15 +87,17 @@
 
   ns.SimplePen.prototype.releaseToolAt = function(col, row, frame, overlay, event) {
     // apply on real frame
-    this.setPixelsToFrame_(frame, this.pixels);
+    var undoFrame = this.wrapFrameForUndo(frame, this.undoPixels);
+    this.setPixelsToFrame(undoFrame, this.pixels);
 
     // save state
     this.raiseSaveStateEvent({
       pixels : this.pixels.slice(0),
-      color : this.getToolColor()
     }, {
       affectsOnlyCurrentFrame : true,
       affectsOnlyCurrentLayer : true,
+    }, {
+      pixels : undoFrame.getUndoPixels(),
     });
 
     // reset
@@ -94,16 +105,15 @@
   };
 
   ns.SimplePen.prototype.replay = function (frame, replayData) {
-    this.setPixelsToFrame_(frame, replayData.pixels, replayData.color);
+    this.setPixelsToFrame(frame, replayData.pixels);
   };
 
-  ns.SimplePen.prototype.setPixelsToFrame_ = function (frame, pixels, color) {
-    pixels.forEach(function (pixel) {
-      frame.setPixel(pixel.col, pixel.row, pixel.color);
-    });
+  ns.SimplePen.prototype.undo = function (frame, undoData) {
+    this.setPixelsToFrame(frame, undoData.pixels);
   };
 
   ns.SimplePen.prototype.resetUsedPixels_ = function() {
     this.pixels = [];
+    this.undoPixels.clear();
   };
 })();

@@ -117,18 +117,22 @@
   ns.HistoryService.prototype.getUndoOptimizationFunction_ = function (i) {
     var state = this.stateQueue[i];
     if (state && state.action.optimize) {
-      var optimization = this.mergeOptimization_(state);
       return function () {
-        return optimization;
-      };
+        return this.mergeOptimization_(state);
+      }.bind(this);
     }
     return undefined;
   },
 
   ns.HistoryService.prototype.undo = function () {
-    this.loadState(this.currentIndex - 1, {
+    var index = this.currentIndex - 1;
+    var optimizer = {
       getOptimization : this.getUndoOptimizationFunction_(this.currentIndex),
-    });
+    };
+    if (!this.fastTrackUndo_(index, optimizer)) {
+      delete optimizer.optimization;
+      this.loadState(index, optimizer);
+    }
   };
 
   ns.HistoryService.prototype.redo = function () {
@@ -145,6 +149,18 @@
     if (!this.fastTrackRedo_(index, optimizer)) {
       delete optimizer.optimization;
       this.loadState(index, optimizer);
+    }
+  };
+
+  ns.HistoryService.prototype.fastTrackUndo_ = function (index, optimizer) {
+    var indexToUndo = this.currentIndex;
+    if (this.isLoadStateAllowed_(index) && this.stateQueue[indexToUndo].action.undo) {
+      this.performReset_(index, optimizer, function () {
+        this.undoState(this.stateQueue[indexToUndo]);
+      }.bind(this));
+      return true;
+    } else {
+      return false;
     }
   };
 
@@ -230,32 +246,35 @@
   };
 
   ns.HistoryService.prototype.replay_ = function (index, snapshotIndex, optimizer, piskel) {
+    this.performReset_(index, optimizer, function () {
+      // Fast-track redos don't load a new piskel.
+      if (piskel) {
+        piskel.setDescriptor(this.piskelController.piskel.getDescriptor());
+        // propagate save path to the new piskel instance
+        piskel.savePath = this.piskelController.piskel.savePath;
+        this.piskelController.setPiskel(piskel);
+      }
+
+      for (var i = snapshotIndex + 1 ; i <= index ; i++) {
+        var state = this.stateQueue[i];
+        this.setupState(state);
+        this.replayState(state);
+        if (optimizer && optimizer.onReplay) {
+          optimizer.onReplay(state);
+        }
+      }
+    }.bind(this));
+  };
+
+  ns.HistoryService.prototype.performReset_ = function (index, optimizer, applyChanges) {
     var originalSize = this.getPiskelSize_();
 
-    // Fast-track redos don't load a new piskel.
-    if (piskel) {
-      piskel.setDescriptor(this.piskelController.piskel.getDescriptor());
-      // propagate save path to the new piskel instance
-      piskel.savePath = this.piskelController.piskel.savePath;
-      this.piskelController.setPiskel(piskel);
-    }
-
-    for (var i = snapshotIndex + 1 ; i <= index ; i++) {
-      var state = this.stateQueue[i];
-      this.setupState(state);
-      this.replayState(state);
-      if (optimizer && optimizer.onReplay) {
-        optimizer.onReplay(state);
-      }
-    }
+    applyChanges();
 
     // Should only do this when going backwards
     var lastState = this.stateQueue[index + 1];
     if (lastState) {
       this.setupState(lastState);
-      if (optimizer && optimizer.onLastState) {
-        optimizer.onLastState(lastState);
-      }
     }
 
     var optimization;
@@ -285,10 +304,15 @@
 
   ns.HistoryService.prototype.replayState = function (state) {
     var action = state.action;
-    var type = action.type;
     var layer = this.piskelController.getLayerAt(state.layerIndex);
     var frame = layer.getFrameAt(state.frameIndex);
     action.scope.replay(frame, action.replay);
   };
 
+  ns.HistoryService.prototype.undoState = function (state) {
+    var action = state.action;
+    var layer = this.piskelController.getLayerAt(state.layerIndex);
+    var frame = layer.getFrameAt(state.frameIndex);
+    action.scope.undo(frame, action.undo);
+  };
 })();

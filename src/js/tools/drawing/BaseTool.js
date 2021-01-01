@@ -19,6 +19,8 @@
 
   ns.BaseTool.prototype.replay = Constants.ABSTRACT_FUNCTION;
 
+  ns.BaseTool.prototype.undo = Constants.ABSTRACT_FUNCTION;
+
   ns.BaseTool.prototype.supportsDynamicPenSize = function() {
     return false;
   };
@@ -89,5 +91,49 @@
    */
   ns.BaseTool.prototype.supportsAlt = function () {
     return false;
+  };
+
+  ns.BaseTool.prototype.setPixelsToFrame = function (frame, pixels) {
+    pixels.forEach(function (pixel) {
+      frame.setPixel(pixel.col, pixel.row, pixel.color);
+    });
+  };
+
+  ns.BaseTool.prototype.wrapFrameForUndo = function (frame, initialUndoPixelMap) {
+    // Intercept each setPixel call and see if we need to remember its state.
+    // Some tools like to set the same pixel multiple times, so we have to
+    // keep track of which ones we already remembered to not clobber ourselves.
+    var wrapper = Object.create(frame);
+
+    if (initialUndoPixelMap) {
+      wrapper.gotten = new Set(initialUndoPixelMap.keys());
+      wrapper.undoPixels = Array.from(initialUndoPixelMap.values());
+    } else {
+      wrapper.gotten = new Set();
+      wrapper.undoPixels = [];
+    }
+
+    wrapper.setUndoPixel_ = function (x, y, color) {
+      var index = y * this.getWidth() + x;
+      if (!this.gotten.has(index)) {
+        this.gotten.add(index);
+        this.undoPixels.push({
+          col : x,
+          row : y,
+          color : this.getPixel(x, y),
+        });
+      }
+    };
+
+    wrapper.setPixel = function (x, y, color) {
+      this.setUndoPixel_(x, y, color);
+      Object.getPrototypeOf(this).setPixel(x, y, color);
+    };
+
+    wrapper.getUndoPixels = function () {
+      return this.undoPixels;
+    };
+
+    return wrapper;
   };
 })();

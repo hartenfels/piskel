@@ -56,7 +56,8 @@
     var coords = this.getCoordinates_(col, row, event);
     var color = this.getToolColor();
     var penSize = pskl.app.penSizeService.getPenSize();
-    this.draw(coords.col, coords.row, color, frame, penSize);
+    var undoFrame = this.wrapFrameForUndo(frame);
+    this.draw(coords.col, coords.row, color, undoFrame, penSize);
 
     $.publish(Events.DRAG_END);
     this.raiseSaveStateEvent({
@@ -69,6 +70,8 @@
     }, {
       affectsOnlyCurrentFrame : true,
       affectsOnlyCurrentLayer : true,
+    }, {
+      pixels : undoFrame.getUndoPixels(),
     });
   };
 
@@ -79,6 +82,13 @@
     this.startCol = replayData.startCol;
     this.startRow = replayData.startRow;
     this.draw(replayData.col, replayData.row, replayData.color, frame, replayData.penSize);
+  };
+
+  /**
+   * @override
+   */
+  ns.ShapeTool.prototype.undo = function (frame, undoData) {
+    this.setPixelsToFrame(frame, undoData.pixels);
   };
 
   /**

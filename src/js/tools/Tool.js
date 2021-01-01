@@ -15,12 +15,13 @@
     return this.toolId;
   };
 
-  ns.Tool.prototype.raiseSaveStateEvent = function (replayData, optimizationData) {
+  ns.Tool.prototype.raiseSaveStateEvent = function (replayData, optimizationData, undoData) {
     $.publish(Events.PISKEL_SAVE_STATE, {
       type : pskl.service.HistoryService.REPLAY,
       scope : this,
       replay : replayData,
       optimize : optimizationData,
+      undo : undoData,
     });
   };
 })();

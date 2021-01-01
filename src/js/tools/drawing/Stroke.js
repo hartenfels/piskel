@@ -73,7 +73,8 @@
 
     // The user released the tool to draw a line. We will compute the pixel coordinate, impact
     // the model and draw them in the drawing canvas (not the fake overlay anymore)
-    this.draw_(col, row, color, frame, penSize, isStraight);
+    var undoFrame = this.wrapFrameForUndo(frame);
+    this.draw_(col, row, color, undoFrame, penSize, isStraight);
 
     // For now, we are done with the stroke tool and don't need an overlay anymore:
     overlay.clear();
@@ -89,6 +90,8 @@
     }, {
       affectsOnlyCurrentFrame : true,
       affectsOnlyCurrentLayer : true,
+    }, {
+      pixels : undoFrame.getUndoPixels(),
     });
   };
 
@@ -134,4 +137,7 @@
     this.draw_(replayData.col, replayData.row, replayData.color, frame, replayData.penSize, replayData.isStraight);
   };
 
+  ns.Stroke.prototype.undo = function (frame, undoData) {
+    this.setPixelsToFrame(frame, undoData.pixels);
+  };
 })();
