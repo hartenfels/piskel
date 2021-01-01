@@ -101,8 +101,11 @@
      * @private
      */
     writeToLocalStorage_ : function (key, value) {
-      // TODO(grosbouddha): Catch storage exception here.
-      window.localStorage[key] = JSON.stringify(value);
+      try {
+        window.localStorage[key] = JSON.stringify(value);
+      } catch (e) {
+        console.error('Error saving to local storage: ' + e);
+      }
     },
 
     /**
